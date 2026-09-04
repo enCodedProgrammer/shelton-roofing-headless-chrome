@@ -1,0 +1,5 @@
+node_modules/
+postcard-test/
+.env
+*.key
+*.json.key

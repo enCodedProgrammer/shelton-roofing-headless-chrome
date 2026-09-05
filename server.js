@@ -4,6 +4,7 @@
 
 const express = require('express');
 const puppeteer = require('puppeteer');
+const sharp = require('sharp');
 
 const app = express();
 app.use(express.json({ limit: '32mb' }));
@@ -42,15 +43,34 @@ async function getBrowser() {
   return browserPromise;
 }
 
-async function renderPanel(html) {
+async function renderPanel(html, label) {
   const browser = LOW_MEMORY ? await puppeteer.launch(launchOpts()) : await getBrowser();
   const page = await browser.newPage();
   try {
+    // Viewport MUST be the full artboard so `position:absolute; inset:0` fills it
+    // and the clipped screenshot comes out exactly WIDTH x HEIGHT (the white-void fix).
     await page.setViewport({ width: WIDTH, height: HEIGHT, deviceScaleFactor: 1 });
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 60000 });
+    // Don't shoot until fonts are ready, or Montserrat falls back to Arial.
     await page.evaluateHandle('document.fonts.ready');
     await new Promise(r => setTimeout(r, 500));
-    return await page.screenshot({ type: 'png', encoding: 'base64' });
+    // Screenshot the exact artboard rectangle — never rely on element/page auto-size.
+    // Newer Puppeteer returns a Uint8Array; wrap in Buffer so .toString('base64')
+    // actually base64-encodes (Uint8Array.toString ignores the encoding arg).
+    const buf = Buffer.from(await page.screenshot({
+      type: 'png',
+      clip: { x: 0, y: 0, width: WIDTH, height: HEIGHT },
+    }));
+
+    // Verify the PNG is exactly WIDTH x HEIGHT. Anything else letterboxes downstream.
+    const meta = await sharp(buf).metadata();
+    console.log(`rendered ${label || 'panel'}: ${meta.width}x${meta.height}`);
+    if (meta.width !== WIDTH || meta.height !== HEIGHT) {
+      throw new Error(
+        `${label || 'panel'} rendered ${meta.width}x${meta.height}, expected ${WIDTH}x${HEIGHT}`
+      );
+    }
+    return buf.toString('base64');
   } finally {
     await page.close();
     if (LOW_MEMORY) { await browser.close(); }
@@ -68,8 +88,8 @@ app.post('/render', async (req, res) => {
     return res.status(400).json({ error: 'front_html and back_html are both required' });
   }
   try {
-    const front_png = await renderPanel(front_html);
-    const back_png = await renderPanel(back_html);
+    const front_png = await renderPanel(front_html, 'front');
+    const back_png = await renderPanel(back_html, 'back');
     res.json({ front_png, back_png, width: WIDTH, height: HEIGHT });
   } catch (err) {
     console.error('render failed:', err);

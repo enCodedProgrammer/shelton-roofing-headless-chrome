@@ -1,2 +1,15 @@
+# The image only needs the service + self-contained templates (logo, QR, and
+# font are already embedded as base64). Keep source assets, references, tests
+# and docs out of the build context.
 node_modules
-npm-debug.log
+npm-debug.log*
+*.log
+postcard-test
+*.png
+*.jpg
+*.jpeg
+*.woff2
+test-render.js
+claude.md
+.git
+.gitignore

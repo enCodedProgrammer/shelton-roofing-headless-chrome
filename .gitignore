@@ -1,5 +1,10 @@
 node_modules/
 postcard-test/
 .env
+.env.*
 *.key
 *.json.key
+npm-debug.log*
+*.log
+.DS_Store
+Thumbs.db

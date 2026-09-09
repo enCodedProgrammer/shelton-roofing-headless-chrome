@@ -12,13 +12,9 @@ WORKDIR /app
 ENV PUPPETEER_SKIP_DOWNLOAD=true \
     PUPPETEER_CACHE_DIR=/home/pptruser/.cache/puppeteer
 
-# Montserrat as an OS font so Chrome finds it by family name (fixes the Arial
-# fallback), plus fontconfig to register it. document.fonts.ready then resolves
-# with the real font present — no network fetch needed at render time.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends fonts-montserrat fontconfig \
-    && fc-cache -f \
-    && rm -rf /var/lib/apt/lists/*
+# Fonts (Montserrat + Kaushan Script) are embedded directly in the templates as
+# base64 @font-face, so no OS font package is needed and there is no network font
+# fetch at render time. To refresh the embedded weights, run: node embed-fonts.js
 
 COPY package*.json ./
 RUN npm install --omit=dev
